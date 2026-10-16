@@ -28,9 +28,6 @@ jobs:
           if (!(Test-Path "pubspec.yaml")) {
             throw "pubspec.yaml was not found at the repository root. Commit your Flutter project at the root of this repository."
           }
-          if (!(Test-Path "windows")) {
-            throw "The windows/ platform folder is missing. Generate it from a machine with Flutter using: flutter create --platforms=windows,android ."
-          }
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -38,28 +35,37 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Generate missing platform scaffolding
+        run: flutter create --platforms=windows,android .
+
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Verify Windows output
+      - name: Package Windows app
         shell: pwsh
         run: |
           $releaseDir = "build/windows/x64/runner/Release"
-          if (!(Test-Path "$releaseDir/LanBridge.exe")) {
+          if (!(Test-Path $releaseDir)) {
             $exe = Get-ChildItem -Path "build/windows" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if (!$exe) {
               throw "No Windows executable was produced. Check the build log."
             }
             $releaseDir = $exe.DirectoryName
           }
-          if (!(Test-Path $releaseDir)) {
-            throw "Windows release directory was not found."
+          if (!(Get-ChildItem -Path $releaseDir -Filter "*.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+            throw "The Windows release directory does not contain an executable."
           }
           Compress-Archive -Path "$releaseDir/*" -DestinationPath "LanBridge-Windows.zip" -Force
 
@@ -79,9 +85,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify Flutter project
-        run: |
-          test -f pubspec.yaml || { echo "::error::pubspec.yaml was not found at the repository root."; exit 1; }
-          test -d android || { echo "::error::The android/ platform folder is missing. Generate it using: flutter create --platforms=windows,android ."; exit 1; }
+        run: test -f pubspec.yaml || { echo "::error::pubspec.yaml was not found at the repository root."; exit 1; }
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -95,8 +99,17 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Generate missing platform scaffolding
+        run: flutter create --platforms=windows,android .
+
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
       - name: Build release APK
         run: flutter build apk --release
