@@ -114,8 +114,14 @@ jobs:
       - name: Analyze Dart code
         run: flutter analyze
 
-      - name: Run tests
-        run: flutter test
+      - name: Run tests when present
+        shell: bash
+        run: |
+          if [ -d test ] && find test -type f -name '*_test.dart' -print -quit | grep -q .; then
+            flutter test
+          else
+            echo "No Dart test files found; skipping test step."
+          fi
 
       - name: Build release APK
         run: flutter build apk --release
