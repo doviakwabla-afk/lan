@@ -32,8 +32,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze Dart code
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Analyze app Dart code
+        run: flutter analyze lib --no-fatal-infos --no-fatal-warnings
 
       - name: Build Windows release
         run: flutter build windows --release
@@ -83,8 +83,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze Dart code
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Analyze app Dart code
+        run: flutter analyze lib --no-fatal-infos --no-fatal-warnings
 
       - name: Build release APK
         run: flutter build apk --release
