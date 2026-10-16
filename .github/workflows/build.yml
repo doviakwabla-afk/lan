@@ -38,6 +38,139 @@ jobs:
       - name: Generate missing platform scaffolding
         run: flutter create --platforms=windows,android .
 
+      - name: Fix generated default widget test
+        shell: pwsh
+        run: |
+          if (Test-Path "test/widget_test.dart") {
+            $testContent = Get-Content "test/widget_test.dart" -Raw
+            if ($testContent.Contains("MyApp")) {
+              $testContent.Replace("MyApp", "LanBridgeApp") | Set-Content "test/widget_test.dart"
+            }
+          }
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Run tests when present
+        shell: bash
+        run: |
+          if [ -d test ] && find test -type f -name '*_test.dart' -print -quit | grep -q .; then
+            flutter test
+          else
+            echo "No Dart test files found; skipping test step."
+          fi
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package Windows app
+        shell: pwsh
+        run: |
+          $releaseDir = "build/windows/x64/runner/Release"
+          if (!(Test-Path $releaseDir)) {
+            $exe = Get-ChildItem -Path "build/windows" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (!$exe) {
+              throw "No Windows executable was produced. Check the build log."
+            }
+            $releaseDir = $exe.DirectoryName
+          }
+          if (!(Get-ChildItem -Path $releaseDir -Filter "*.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+            throw "The Windows release directory does not contain an executable."
+          }
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath "LanBridge-Windows.zip" -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LanBridge-Windows
+          path: LanBridge-Windows.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Flutter project
+        run: test -f pubspec.yaml || { echo "::error::pubspec.yaml was not found at the repository root."; exit 1; }
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+name: Build LanBridge
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lanbridge-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Build Windows release
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Flutter project
+        shell: pwsh
+        run: |
+          if (!(Test-Path "pubspec.yaml")) {
+            throw "pubspec.yaml was not found at the repository root. Commit your Flutter project at the root of this repository."
+          }
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate missing platform scaffolding
+        run: flutter create --platforms=windows,android .
+
+      - name: Fix generated default widget test
+        run: |
+          if [ -f test/widget_test.dart ] && grep -q 'MyApp' test/widget_test.dart; then
+            sed -i 's/MyApp/LanBridgeApp/g' test/widget_test.dart
+          fi
+
+      - name: Fix generated default widget test
+        shell: pwsh
+        run: |
+          if (Test-Path "test/widget_test.dart") {
+            $testContent = Get-Content "test/widget_test.dart" -Raw
+            if ($testContent.Contains("MyApp")) {
+              $testContent.Replace("MyApp", "LanBridgeApp") | Set-Content "test/widget_test.dart"
+            }
+          }
+
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
 
